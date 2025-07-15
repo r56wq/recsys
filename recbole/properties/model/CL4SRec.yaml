@@ -1,0 +1,42 @@
+# CL4SRec model configuration for local CPU training
+# Based on SASRec with contrastive learning enhancements
+
+# Transformer architecture parameters
+n_layers: 2                     # (int) The number of transformer layers in transformer encoder.
+n_heads: 2                      # (int) The number of attention heads for multi-head attention layer.
+hidden_size: 64                 # (int) The number of features in the hidden state.
+inner_size: 256                 # (int) The inner hidden size in feed-forward layer.
+hidden_dropout_prob: 0.5        # (float) The probability of an element to be zeroed.
+attn_dropout_prob: 0.5          # (float) The probability of an attention score to be zeroed.
+hidden_act: 'gelu'              # (str) The activation function in feed-forward layer.
+layer_norm_eps: 1e-12           # (float) A value added to the denominator for numerical stability. 
+initializer_range: 0.02         # (float) The standard deviation for normal initialization.
+loss_type: 'BPR'                # (str) The type of loss function. Range in ['BPR', 'CE'].
+
+# Contrastive learning parameters
+temperature: 0.1                 # (float) Temperature parameter for InfoNCE loss.
+similarity_type: 'cosine'        # (str) Similarity type for contrastive loss. Range in ['cosine', 'dot'].
+
+# Data augmentation parameters
+crop_ratio: 0.8                 # (float) The ratio of items to keep in crop augmentation (0.0 to 1.0).
+mask_ratio: 0.2                 # (float) The ratio of items to mask in mask augmentation (0.0 to 1.0).
+reorder_ratio: 0.3              # (float) The ratio of sequences to apply reordering (0.0 to 1.0).
+
+# Training parameters (optimized for local CPU)
+epochs: 10                      # (int) Number of training epochs (reduced for local testing).
+train_batch_size: 32            # (int) Training batch size (smaller for CPU).
+eval_batch_size: 32             # (int) Evaluation batch size.
+learning_rate: 0.001            # (float) Learning rate.
+eval_step: 2                    # (int) Evaluation frequency (every 2 epochs).
+stopping_step: 5                # (int) Early stopping patience.
+
+# Environment settings
+use_gpu: False                  # (bool) Use CPU for local testing.
+gpu_id: ''                      # (str) Empty for CPU usage.
+worker: 0                       # (int) No multiprocessing for local testing.
+
+# Evaluation settings
+metrics: ['Recall', 'MRR', 'NDCG', 'Hit', 'Precision']  # (list) Evaluation metrics.
+topk: [10]                      # (list) Top-k values for evaluation.
+valid_metric: MRR@10            # (str) Metric for early stopping.
+valid_metric_bigger: True       # (bool) Higher is better for MRR. 
