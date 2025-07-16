@@ -171,3 +171,62 @@ class InfoNCELoss(nn.Module):
         loss = -positive_sim + torch.logaddexp(positive_sim, log_sum_exp_neg)
         
         return loss.mean()
+
+
+class CL4SRecMainLoss(nn.Module):
+    """CL4SRecMainLoss, main task loss for CL4SRec (Contrastive Learning for Sequential Recommendation)
+    
+    Implements the main sequence prediction task loss as described in the CL4SRec paper:
+    L_main(s_u,t) = -log [ exp(s_u,t^T v^+_t+1) / (exp(s_u,t^T v^+_t+1) + Σ_{v^-_{t+1} ∈ V^-} exp(s_u,t^T v^-_{t+1})) ]
+    
+    This is a negative log-likelihood with sampled softmax, where:
+    - s_u,t: inferred user representation at time step t
+    - v^+_t+1: the positive item which user u interacts at time step t+1
+    - v^-_{t+1}: randomly sampled negative items at time step t+1
+    """
+
+    def __init__(self):
+        super(CL4SRecMainLoss, self).__init__()
+
+    def forward(self, user_repr, pos_item_repr, neg_item_reprs):
+        """Compute CL4SRec main task loss.
+        
+        Args:
+            user_repr (torch.tensor): User representations s_u,t, shape (N, D)
+            pos_item_repr (torch.tensor): Positive item representations v^+_t+1, shape (N, D)
+            neg_item_reprs (torch.tensor): Negative item representations v^-_{t+1}, shape (N, K, D)
+                                        where K is the number of negative samples per positive item
+            
+        Returns:
+            loss (torch.tensor): CL4SRec main task loss scalar
+        """
+        N, D = user_repr.shape
+        K = neg_item_reprs.shape[1] if neg_item_reprs.dim() == 3 else 1
+        
+        # Compute positive item scores: s_u,t^T v^+_t+1
+        pos_scores = torch.sum(user_repr * pos_item_repr, dim=1)  # Shape: (N,)
+        
+        # Compute negative item scores: s_u,t^T v^-_{t+1}
+        if neg_item_reprs.dim() == 3:
+            # Reshape for batch computation
+            user_repr_expanded = user_repr.unsqueeze(1).expand(-1, K, -1)  # Shape: (N, K, D)
+            neg_scores = torch.sum(user_repr_expanded * neg_item_reprs, dim=2)  # Shape: (N, K)
+        else:
+            # Single negative sample per positive item
+            neg_scores = torch.sum(user_repr * neg_item_reprs, dim=1).unsqueeze(1)  # Shape: (N, 1)
+        
+        # Vectorized computation of the loss
+        # Numerator: exp(s_u,t^T v^+_t+1)
+        pos_exp = torch.exp(pos_scores)  # Shape: (N,)
+        
+        # Denominator: exp(s_u,t^T v^+_t+1) + Σ_{v^-_{t+1} ∈ V^-} exp(s_u,t^T v^-_{t+1})
+        neg_exp_sum = torch.sum(torch.exp(neg_scores), dim=1)  # Shape: (N,)
+        denominator = pos_exp + neg_exp_sum  # Shape: (N,)
+        
+        # Compute loss: -log(exp(pos_scores) / denominator)
+        # This is equivalent to: -pos_scores + log(denominator)
+        loss = -pos_scores + torch.log(denominator)
+        
+        return loss.mean()
+    
+    

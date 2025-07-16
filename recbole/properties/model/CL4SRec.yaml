@@ -16,6 +16,7 @@ loss_type: 'BPR'                # (str) The type of loss function. Range in ['BP
 # Contrastive learning parameters
 temperature: 0.1                 # (float) Temperature parameter for InfoNCE loss.
 similarity_type: 'cosine'        # (str) Similarity type for contrastive loss. Range in ['cosine', 'dot'].
+cl_weight: 0.1                  # (float) Weight for contrastive learning loss in total loss (L_total = L_main + cl_weight * L_cl).
 
 # Data augmentation parameters
 crop_ratio: 0.8                 # (float) The ratio of items to keep in crop augmentation (0.0 to 1.0).
@@ -35,8 +36,17 @@ use_gpu: False                  # (bool) Use CPU for local testing.
 gpu_id: ''                      # (str) Empty for CPU usage.
 worker: 0                       # (int) No multiprocessing for local testing.
 
-# Evaluation settings
+# Evaluation settings for sequential recommendation
+eval_args:                      # (dict) Sequential evaluation settings
+  split: {'LS': 'valid_and_test'}  # (dict) Leave-one-out split for sequential recommendation
+  group_by: user                # (str) Group by user for sequential evaluation
+  order: TO                     # (str) Time Order - sort by timestamp for sequential models
+  mode: full                    # (str) Full evaluation mode
 metrics: ['Recall', 'MRR', 'NDCG', 'Hit', 'Precision']  # (list) Evaluation metrics.
 topk: [10]                      # (list) Top-k values for evaluation.
 valid_metric: MRR@10            # (str) Metric for early stopping.
-valid_metric_bigger: True       # (bool) Higher is better for MRR. 
+valid_metric_bigger: True       # (bool) Higher is better for MRR.
+
+# Dataset loading settings - CRITICAL FIX
+load_col:
+  inter: [user_id, item_id, rating, timestamp] 

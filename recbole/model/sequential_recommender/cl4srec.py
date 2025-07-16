@@ -48,15 +48,16 @@ class CL4SRec(SequentialRecommender):
         self.initializer_range = config["initializer_range"]
         self.loss_type = config["loss_type"]
 
+        # contrastive learning parameters
+        self.cl_weight = config["cl_weight"]  # weight for contrastive learning loss
+
         # define augmentation
         self.crop_augmentation = CropAugmentation(crop_ratio=config["crop_ratio"])
         self.mask_augmentation = MaskAugmentation(mask_ratio=config["mask_ratio"])
         self.reorder_augmentation = ReorderAugmentation(reorder_ratio=config["reorder_ratio"])
 
-        # define loss
+        # define contrastive loss
         self.info_nce_loss = InfoNCELoss(temperature=config["temperature"], similarity_type=config["similarity_type"])
-
-
 
         # define layers and loss
         self.item_embedding = nn.Embedding(
@@ -137,7 +138,6 @@ class CL4SRec(SequentialRecommender):
         
         contrastive_loss = self.info_nce_loss(aug_seq1_output, aug_seq2_output)
         
-        
         seq_output = self.forward(item_seq, item_seq_len)
         pos_items = interaction[self.POS_ITEM_ID]
         if self.loss_type == "BPR":
@@ -146,13 +146,19 @@ class CL4SRec(SequentialRecommender):
             neg_items_emb = self.item_embedding(neg_items)
             pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)  # [B]
             neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)  # [B]
-            loss = self.loss_fct(pos_score, neg_score)
-            return loss + contrastive_loss
-        else:  # self.loss_type = 'CE'
+            main_loss = self.loss_fct(pos_score, neg_score)
+            # Total loss: L_total = L_main + cl_weight * L_cl
+            total_loss = main_loss + self.cl_weight * contrastive_loss
+            return total_loss
+        elif self.loss_type == 'CE':  # self.loss_type = 'CE'
             test_item_emb = self.item_embedding.weight
             logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
-            loss = self.loss_fct(logits, pos_items)
-            return loss
+            main_loss = self.loss_fct(logits, pos_items)
+            # Total loss: L_total = L_main + cl_weight * L_cl
+            total_loss = main_loss + self.cl_weight * contrastive_loss
+            return total_loss
+        else:
+            raise NotImplementedError("Make sure 'loss_type' in ['BPR', 'CE']!")
 
     def predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
